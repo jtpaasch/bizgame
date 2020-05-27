@@ -1,0 +1,200 @@
+"""For simulating a round of buying."""
+
+from . import buyers
+
+from .utils import files
+from .utils import pretty
+from .utils import query
+from .utils import result
+
+def mk_part(idx, part_id, rnd, order):
+    """Create a part record for the products table."""
+    lookup = "=VLOOKUP({},Supplier_parts!$A$2:$Z$1000,{},FALSE"
+    col = "D{}".format(idx + 1)
+    supplier_id = lookup.format(col, 2)
+    supplier_name = lookup.format(col, 3)
+    part_variant_id = lookup.format(col, 4)
+    part_variant_name = lookup.format(col, 5)
+    part_type_id = lookup.format(col, 6)
+    part_type_name = lookup.format(col, 7)
+    sell_price = lookup.format(col, 8)
+    return {
+        "Round": rnd,
+        "Company_ID": order["Company_ID"],
+        "Supplier_part_ID": part_id,
+        "Supplier_ID": supplier_id,
+        "Supplier_name": supplier_name,
+        "Part_variant_ID": part_variant_id,
+        "Part_variant_name": part_variant_name,
+        "Part_type_ID": part_type_id,
+        "Part_type_name": part_type_name,
+        "Sell_price": sell_price,
+    }
+
+def mk_products(rnd, orders):
+    """Build the products table data."""
+    output = []
+    idx = 1
+    for order in orders:
+        part_id = order["Heating_element"]
+        datum = mk_part(idx, part_id, rnd, order)
+        output.append(datum)
+        idx = idx + 1
+        part_id = order["Heating_bowl"]
+        datum = mk_part(idx, part_id, rnd, order)
+        output.append(datum)
+        idx = idx + 1
+        part_id = order["Interface"]
+        datum = mk_part(idx, part_id, rnd, order)
+        output.append(datum)
+        idx = idx + 1
+        part_id = order["Power_unit"]
+        datum = mk_part(idx, part_id, rnd, order)
+        output.append(datum)
+        idx = idx + 1
+    return output
+
+def mk_production(rnd, orders):
+    """Build the production table data."""
+    output = []
+    idx = 1
+    criteria_1 = "Products!$B$2:$B$10000,A{}"
+    criteria_2 = "Products!$C$2:$C$10000,B{}"
+    lookup = "=SUMIFS(Products!$K$2:$K$10000,{},{})"
+    lookup_2 = "=C{}*E{}"
+    for order in orders:
+        row = idx + 1
+        slot_1 = criteria_1.format(row)
+        slot_2 = criteria_2.format(row)
+        cost_per_unit = lookup.format(slot_1, slot_2)
+        cost_all_units = lookup_2.format(row, row)
+        datum = {
+            "Round": rnd,
+            "Company_ID": order["Company_ID"],
+            "Units": order["Num_units"],
+            "Sell_price": order["Sell_price"],
+            "Cost_per_unit": cost_per_unit,
+            "Cost_all_units": cost_all_units,
+            "Available_capital": pretty.usd(100000),
+        }
+        output.append(datum)
+        idx = idx + 1
+    return output
+
+def mk_sales(rnd, customers, values, products):
+    """Build the sales table data."""
+    output = []
+    inventory = {x["Company_ID"]: int(x["Units"]) for x in products}
+    for customer in customers:
+        customer_id = customer["ID"]
+        vals = query.select(values, "Customer_ID", customer_id)
+        if vals:
+            purchase = buyers.buy(customer_id, products, vals, inventory)
+            if purchase:
+                remaining = inventory[purchase["Company_ID"]] - 1
+                inventory[purchase["Company_ID"]] = remaining
+                datum = {
+                    "Round": rnd,
+                    "Customer_ID": customer_id,
+                    "Company_ID": purchase["Company_ID"],
+                    "Purchase_price": pretty.usd(purchase["Sell_price"]),
+                }
+                output.append(datum)
+    return output
+
+def mk_revenue(rnd, products, purchases, financials):
+    """Build the revenue table data."""
+    output = []
+    for product in products:
+        company_id = product["Company_ID"]
+        sales = query.select(purchases, "Company_ID", company_id)
+        sales = query.select(sales, "Round", rnd)
+        units_sold = len(sales)
+        total_sales = 0
+        if sales:
+            prices = [pretty.float_of_usd(x["Purchase_price"]) for x in sales]
+            total_sales = sum(prices)
+        total_costs = int(product["Units"]) * product["Cost"]
+        profit = total_sales - total_costs
+        capital = financials[company_id] + profit
+        datum = {
+            "Company_ID": company_id,
+            "Round": rnd,
+            "Cost_per_unit": pretty.usd(product["Cost"]),
+            "Units_manufactured": product["Units"],
+            "Total_costs": pretty.usd(total_costs),
+            "Sell_price": pretty.usd(product["Sell_price"]),
+            "Units_sold": units_sold,
+            "Sales": pretty.usd(total_sales),
+            "Profit": pretty.usd(profit),
+            "Capital": pretty.usd(capital),
+        }
+        output.append(datum)
+    return output
+
+def buying(data, rnd):
+    """Simulate a round of buying."""
+    if rnd == 1:
+        msg = "Cannot simulate buying for round 1. Only round 2 and up."
+        return result.error(msg)
+
+    # There's no simulation history before round 2.
+    append = False if rnd == 2 else True
+
+    # Get the orders.
+    orders_input = files.input_filepath(data, rnd, "orders")
+    r = files.get_data(orders_input)
+    if result.is_error(r):
+        return r
+    orders = result.v(r)
+
+    # Build the products.
+    products = mk_products(rnd, orders)
+    filepath = files.table_filepath(data, rnd, "products")
+    files.write_data(filepath, products, append=append)
+
+    # Build the production data.
+    production = mk_production(rnd, orders)
+    filepath = files.table_filepath(data, rnd, "production")
+    files.write_data(filepath, production, append=append)
+
+    # Get the customers
+    filepath = files.table_filepath(data, rnd, "customers")
+    r = files.get_data(filepath)
+    if result.is_error(r):
+        return r
+    customers = result.v(r)
+
+    # Get the customer values
+    filepath = files.table_filepath(data, rnd, "customer_values")
+    r = files.get_data(filepath)
+    if result.is_error(r):
+        return r
+    values = result.v(r)
+
+    # Get product data for this round.
+    r = query.products(data, rnd)
+    if result.is_error(r):
+        return r
+    products = result.v(r)
+
+    # Build the purchases data.
+    purchases = mk_sales(rnd, customers, values, products)
+    filepath = files.table_filepath(data, rnd, "purchases")
+    files.write_data(filepath, purchases, append=append)
+
+    # Get financial data.
+    r = query.financials(data, rnd)
+    if result.is_error(r):
+        return r
+    financials = result.v(r)
+
+    # Build the revenue data.
+    revenue = mk_revenue(rnd, products, purchases, financials)
+    filepath = files.table_filepath(data, rnd, "revenue")
+    files.write_data(filepath, revenue, append=append)
+
+    # Create the baseline data for the next round.
+    files.new_round(data, rnd + 1)
+
+    return result.ok()
