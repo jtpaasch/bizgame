@@ -9,8 +9,8 @@ from .utils import result
 
 def mk_part(idx, part_id, rnd, order):
     """Create a part record for the products table."""
-    lookup = "=VLOOKUP({},Supplier_parts!$A$2:$Z$1000,{},FALSE"
-    col = "D{}".format(idx + 1)
+    lookup = "=VLOOKUP({},Supplier_parts!$A$2:$Z$1000,{},FALSE)"
+    col = "C{}".format(idx + 1)
     supplier_id = lookup.format(col, 2)
     supplier_name = lookup.format(col, 3)
     part_variant_id = lookup.format(col, 4)
@@ -58,9 +58,9 @@ def mk_production(rnd, orders):
     """Build the production table data."""
     output = []
     idx = 1
-    criteria_1 = "Products!$B$2:$B$10000,A{}"
-    criteria_2 = "Products!$C$2:$C$10000,B{}"
-    lookup = "=SUMIFS(Products!$K$2:$K$10000,{},{})"
+    criteria_1 = "Products!$A$2:$A$10000,A{}"
+    criteria_2 = "Products!$B$2:$B$10000,B{}"
+    lookup = "=SUMIFS(Products!$J$2:$J$10000,{},{})"
     lookup_2 = "=C{}*E{}"
     for order in orders:
         row = idx + 1
