@@ -1,5 +1,6 @@
 """Handles buyers/purchasing."""
 
+from .utils import pretty
 from .utils import query
 
 def candidates_by_supplier(products, values):
@@ -32,16 +33,19 @@ def candidates_by_variant(products, values):
             output.append(product)
     return sorted(output, key=lambda record: record["Sell_price"])
 
-def next_available(candidates, available):
-    """Find the first available candidate."""
+def next_available(customer, candidates, available):
+    """Find the first affordable and available candidate."""
     while len(candidates) > 0:
         units_available = available[candidates[0]["Company_ID"]]
         if units_available > 0:
-            return candidates[0]
+            sell_price = candidates[0]["Sell_price"]
+            cash = pretty.float_of_usd(customer["Cash"])
+            if sell_price <= cash:
+                return candidates[0]
         candidates = candidates[1:]
     return None
 
-def buy(customer_id, products, values, inventory):
+def buy(customer, products, values, inventory):
     """Select a product for a customer."""
     vals = sorted(values, key=lambda record: record["Weight"])
 
@@ -50,7 +54,7 @@ def buy(customer_id, products, values, inventory):
     while len(selected_values) > 0:
         candidates = candidates_by_supplier(products, selected_values)
         if candidates:
-            candidate = next_available(candidates, inventory)
+            candidate = next_available(customer, candidates, inventory)
             if candidate:
                 return candidate
         selected_values = selected_values[1:]
@@ -61,7 +65,7 @@ def buy(customer_id, products, values, inventory):
     while len(selected_values) > 0:
         candidates = candidates_by_variant(products, selected_values)
         if candidates:
-            candidate = next_available(candidates, inventory)
+            candidate = next_available(customer, candidates, inventory)
             if candidate:
                 return candidate
         selected_values = selected_values[1:]

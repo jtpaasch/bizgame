@@ -89,7 +89,7 @@ def mk_sales(rnd, customers, values, products):
         customer_id = customer["ID"]
         vals = query.select(values, "Customer_ID", customer_id)
         if vals:
-            purchase = buyers.buy(customer_id, products, vals, inventory)
+            purchase = buyers.buy(customer, products, vals, inventory)
             if purchase:
                 remaining = inventory[purchase["Company_ID"]] - 1
                 inventory[purchase["Company_ID"]] = remaining
