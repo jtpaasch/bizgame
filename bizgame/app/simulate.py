@@ -54,7 +54,7 @@ def mk_products(rnd, orders):
         idx = idx + 1
     return output
 
-def mk_production(rnd, orders):
+def mk_production(rnd, orders, financials):
     """Build the production table data."""
     output = []
     idx = 1
@@ -68,14 +68,15 @@ def mk_production(rnd, orders):
         slot_2 = criteria_2.format(row)
         cost_per_unit = lookup.format(slot_1, slot_2)
         cost_all_units = lookup_2.format(row, row)
+        company_id = order["Company_ID"]
         datum = {
             "Round": rnd,
-            "Company_ID": order["Company_ID"],
+            "Company_ID": company_id,
             "Units": order["Num_units"],
             "Sell_price": order["Sell_price"],
             "Cost_per_unit": cost_per_unit,
             "Cost_all_units": cost_all_units,
-            "Available_capital": pretty.usd(100000),
+            "Available_capital": pretty.usd(financials[company_id]),
         }
         output.append(datum)
         idx = idx + 1
@@ -141,6 +142,12 @@ def buying(data, rnd):
     # There's no simulation history before round 2.
     append = False if rnd == 2 else True
 
+    # Get financial data.
+    r = query.financials(data, rnd)
+    if result.is_error(r):
+        return r
+    financials = result.v(r)
+
     # Get the orders.
     orders_input = files.input_filepath(data, rnd, "orders")
     r = files.get_data(orders_input)
@@ -154,7 +161,7 @@ def buying(data, rnd):
     files.write_data(filepath, products, append=append)
 
     # Build the production data.
-    production = mk_production(rnd, orders)
+    production = mk_production(rnd, orders, financials)
     filepath = files.table_filepath(data, rnd, "production")
     files.write_data(filepath, production, append=append)
 
@@ -182,12 +189,6 @@ def buying(data, rnd):
     purchases = mk_sales(rnd, customers, values, products)
     filepath = files.table_filepath(data, rnd, "purchases")
     files.write_data(filepath, purchases, append=append)
-
-    # Get financial data.
-    r = query.financials(data, rnd)
-    if result.is_error(r):
-        return r
-    financials = result.v(r)
 
     # Build the revenue data.
     revenue = mk_revenue(rnd, products, purchases, financials)

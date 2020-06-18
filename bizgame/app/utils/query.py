@@ -140,6 +140,20 @@ def products(data, rnd):
     r = mk_products(rnd, companies, products, production, parts)
     return result.ok(r)
 
+def latest_capital(revenue, rnd, company_id):
+    """Find the latest record of capital for a company."""
+    prev_rnd = rnd - 1
+    output = constant.capital
+    if prev_rnd < 2:
+        return output
+    records = select(revenue, "Round", str(prev_rnd))
+    try:
+        record = find(records, "Company_ID", company_id)
+        output = pretty.float_of_usd(record["Capital"])
+        return output
+    except NoMatch:
+        return latest_capital(revenue, prev_rnd, company_id)
+
 def financials(data, rnd):
     """Get financial data for the round."""
     filepath = files.table_filepath(data, rnd, "companies")
@@ -148,10 +162,6 @@ def financials(data, rnd):
         return r
     companies = result.v(r)
 
-    if rnd < 3:
-        output = {x["ID"]: constant.capital for x in companies}
-        return result.ok(output)
-
     filepath = files.table_filepath(data, rnd, "revenue")
     r = files.get_data(filepath)
     if result.is_error(r):
@@ -159,10 +169,8 @@ def financials(data, rnd):
     revenue = result.v(r)
 
     output = {}
-    records = select(revenue, "Round", rnd - 1)
     for company in companies:
-        record = find(records, "Company_ID", company["ID"])
-        output[company["ID"]] = pretty.float_of_usd(record["Capital"])
-
+        company_id = company["ID"]
+        capital = latest_capital(revenue, rnd, company_id)
+        output[company_id] = capital
     return result.ok(output)
-
