@@ -31,10 +31,10 @@ def mk_part(idx, part_id, rnd, order):
         "Sell_price": sell_price,
     }
 
-def mk_products(rnd, orders):
+def mk_products(records, rnd, orders):
     """Build the products table data."""
     output = []
-    idx = 1
+    idx = len(records) + 1
     for order in orders:
         part_id = order["Heating_element"]
         datum = mk_part(idx, part_id, rnd, order)
@@ -54,10 +54,10 @@ def mk_products(rnd, orders):
         idx = idx + 1
     return output
 
-def mk_production(rnd, orders, financials):
+def mk_production(records, rnd, orders, financials):
     """Build the production table data."""
     output = []
-    idx = 1
+    idx = len(records) + 1
     criteria_1 = "Products!$A$2:$A$10000,A{}"
     criteria_2 = "Products!$B$2:$B$10000,B{}"
     lookup = "=SUMIFS(Products!$J$2:$J$10000,{},{})"
@@ -155,13 +155,31 @@ def buying(data, rnd):
         return r
     orders = result.v(r)
 
-    # Build the products.
-    products = mk_products(rnd, orders)
+    # Get any previous product records.
+    records = []
+    if append:
+        filepath = files.table_filepath(data, rnd, "products")
+        r = files.get_data(filepath)
+        if result.is_error(r):
+            return r
+        records = result.v(r)
+
+    # Build the product data.
+    products = mk_products(records, rnd, orders)
     filepath = files.table_filepath(data, rnd, "products")
     files.write_data(filepath, products, append=append)
 
+    # Get any previous production records.
+    records = []
+    if append:
+        filepath = files.table_filepath(data, rnd, "production")
+        r = files.get_data(filepath)
+        if result.is_error(r):
+            return r
+        records = result.v(r)
+
     # Build the production data.
-    production = mk_production(rnd, orders, financials)
+    production = mk_production(records, rnd, orders, financials)
     filepath = files.table_filepath(data, rnd, "production")
     files.write_data(filepath, production, append=append)
 
