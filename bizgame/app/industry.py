@@ -93,7 +93,7 @@ def mk_customer_values(customers, part_types, catalogue):
     for customer in customers:
         for part_type in part_types:
             part_type_id = part_type["ID"]
-            selector = lambda x: x["Part_type_ID"] == part_type_id
+            selector = lambda x: x["Part_type_ID"] == str(part_type_id)
             options = list(filter(selector, catalogue))
             choose = random.randint(0, 1)
             if choose:
