@@ -143,9 +143,6 @@ def products(data, rnd):
 def latest_capital(revenue, rnd, company_id):
     """Find the latest record of capital for a company."""
     prev_rnd = rnd - 1
-    output = constant.capital
-    if prev_rnd < 2:
-        return output
     records = select(revenue, "Round", str(prev_rnd))
     try:
         record = find(records, "Company_ID", company_id)
@@ -162,15 +159,19 @@ def financials(data, rnd):
         return r
     companies = result.v(r)
 
-    filepath = files.table_filepath(data, rnd, "revenue")
-    r = files.get_data(filepath)
-    if result.is_error(r):
-        return r
-    revenue = result.v(r)
+    output = {company["ID"] : constant.capital for company in companies}
+    if rnd > 2:
 
-    output = {}
-    for company in companies:
-        company_id = company["ID"]
-        capital = latest_capital(revenue, rnd, company_id)
-        output[company_id] = capital
+        filepath = files.table_filepath(data, rnd, "revenue")
+        r = files.get_data(filepath)
+        if result.is_error(r):
+            return r
+        revenue = result.v(r)
+
+        output = {}
+        for company in companies:
+            company_id = company["ID"]
+            capital = latest_capital(revenue, rnd, company_id)
+            output[company_id] = capital
+
     return result.ok(output)
