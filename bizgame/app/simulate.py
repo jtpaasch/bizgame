@@ -1,5 +1,6 @@
 """For simulating a round of buying."""
 
+from . import constant
 from . import buyers
 
 from .utils import files
@@ -31,11 +32,61 @@ def mk_part(idx, part_id, rnd, order):
         "Sell_price": sell_price,
     }
 
-def mk_products(records, rnd, orders):
+def is_valid_order(order, catalogue):
+    part_types = constant.part_types
+    part_id = order["Heating_element"]
+    part = query.find(catalogue["value"], "ID", part_id)
+    part_type_id = int(part["Part_type_ID"])
+    part_type = query.find(part_types, "Name", "Heating element")
+    correct_id = part_type["ID"]
+    if part_type_id != correct_id:
+        print("NOT A HEATING ELEMENT!")
+        print(order)
+        print(part)
+        return False
+    part_id = order["Heating_bowl"]
+    part = query.find(catalogue["value"], "ID", part_id)
+    part_type_id = int(part["Part_type_ID"])
+    part_type = query.find(part_types, "Name", "Heating bowl")
+    correct_id = part_type["ID"]
+    if part_type_id != correct_id:
+        print("NOT A HEATING BOWL!")
+        print(order)
+        print(part)
+        return False
+    part_id = order["Interface"]
+    part = query.find(catalogue["value"], "ID", part_id)
+    part_type_id = int(part["Part_type_ID"])
+    part_type = query.find(part_types, "Name", "Interface")
+    correct_id = part_type["ID"]
+    if part_type_id != correct_id:
+        print("NOT AN INTERFACE!")
+        print(order)
+        print(part)
+        return False
+    part_id = order["Power_unit"]
+    part = query.find(catalogue["value"], "ID", part_id)
+    part_type_id = int(part["Part_type_ID"])
+    part_type = query.find(part_types, "Name", "Power unit")
+    correct_id = part_type["ID"]
+    if part_type_id != correct_id:
+        print("NOT A POWER UNIT!")
+        print(order)
+        print(part)
+        return False
+    return True
+
+def mk_products(records, rnd, orders, catalogue):
     """Build the products table data."""
     output = []
     idx = len(records) + 1
     for order in orders:
+        print("---- Processing order -------------")
+        if not is_valid_order(order, catalogue):
+            print("     NOT VALID, SKIPPING")
+            continue
+        else:
+            print("     Ok")
         part_id = order["Heating_element"]
         datum = mk_part(idx, part_id, rnd, order)
         output.append(datum)
@@ -148,6 +199,9 @@ def buying(data, rnd):
         return r
     financials = result.v(r)
 
+    # Get the catalogue
+    catalogue = query.catalogue(data, rnd)
+
     # Get the orders.
     orders_input = files.input_filepath(data, rnd, "orders")
     r = files.get_data(orders_input)
@@ -165,7 +219,7 @@ def buying(data, rnd):
         records = result.v(r)
 
     # Build the product data.
-    products = mk_products(records, rnd, orders)
+    products = mk_products(records, rnd, orders, catalogue)
     filepath = files.table_filepath(data, rnd, "products")
     files.write_data(filepath, products, append=append)
 
