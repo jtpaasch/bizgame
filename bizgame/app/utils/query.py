@@ -143,6 +143,9 @@ def products(data, rnd):
 def latest_capital(revenue, rnd, company_id):
     """Find the latest record of capital for a company."""
     prev_rnd = rnd - 1
+    output = constant.capital	
+    if prev_rnd < 2:	
+        return output
     records = select(revenue, "Round", str(prev_rnd))
     try:
         record = find(records, "Company_ID", company_id)
