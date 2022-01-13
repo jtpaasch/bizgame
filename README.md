@@ -19,7 +19,7 @@ Clone the repo, `cd` into it, and pip install. For example:
     cd bizgame
     python3 -m venv venv
     source venv/bin/activate
-    pip install -u pip
+    python3 -m pip install --upgrade pip    
     pip install -e .
 
 
